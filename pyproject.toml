@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fastermessage"
+version = "0.1.0"
+description = "SDK Python officiel de l'API FasterMessage v2 : SMS, e-mail, OTP, contacts et webhooks."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["fastermessage", "sms", "email", "otp", "api", "sdk"]
+dependencies = []
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://www.fastermessage.com/docs"
+Source = "https://github.com/urbantech229/fastermessage-python"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+fastermessage = ["py.typed"]
