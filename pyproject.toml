@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fastermessage"
-version = "0.1.0"
+version = "0.1.1"
 description = "SDK Python officiel de l'API FasterMessage v2 : SMS, e-mail, OTP, contacts et webhooks."
 readme = "README.md"
 requires-python = ">=3.9"

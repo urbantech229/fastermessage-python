@@ -402,6 +402,78 @@ class TransportReel(unittest.TestCase):
         self.assertRegex(ctx.exception.idempotency_key, "^sdk-")
 
 
+class Durcissement(unittest.TestCase):
+    def test_base_url_refusee(self):
+        for valeur in (
+            "http://api.marque.test",
+            "file:///C:/Windows/win.ini?",
+            "ftp://api.marque.test",
+            "https://compte:secret@api.marque.test",
+            "https://",
+            "https://api.marque.test/?a=1",
+            "api.marque.test",
+        ):
+            with self.assertRaises(ValueError) as ctx:
+                FasterMessage("a", "b", "c", base_url=valeur)
+            self.assertNotIn("secret", str(ctx.exception))
+
+    def test_base_url_acceptee(self):
+        for valeur in ("https://api.marque.test", "https://api.marque.test/x/", "http://localhost:3001", "http://127.0.0.1:9", "http://[::1]:9"):
+            FasterMessage("a", "b", "c", base_url=valeur)
+
+    def test_cle_invalide_refusee_sans_la_citer(self):
+        for cle in ("fm_test_SECRET\nX: y", "fm_test_SECRET ", "fm_test_SECRÉT"):
+            with self.assertRaises(ValueError) as ctx:
+                FasterMessage("a", "b", cle)
+            self.assertNotIn("SECRET", str(ctx.exception))
+
+    def test_en_tetes_fournis_controles(self):
+        banc = Banc([])
+        with self.assertRaises(ValueError):
+            banc.fm.sms.send(SMS, idempotency_key="cle\r\nX: y")
+        with self.assertRaises(ValueError):
+            banc.fm.sms.send(SMS, request_id="r\n")
+        self.assertEqual(banc.calls, [])
+
+    def test_identifiant_de_ressource_refuse(self):
+        banc = Banc([])
+        for valeur in ("", ".", ".."):
+            with self.assertRaises(ValueError):
+                banc.fm.contacts.get(valeur)
+            with self.assertRaises(ValueError):
+                banc.fm.contacts.delete(valeur)
+            with self.assertRaises(ValueError):
+                banc.fm.contact_groups.update(valeur, {"name": "n"})
+            with self.assertRaises(ValueError):
+                banc.fm.messages.get(valeur)
+        self.assertEqual(banc.calls, [])
+
+    def test_identifiant_avec_points_accepte(self):
+        banc = Banc([ok(200, {})])
+        banc.fm.contacts.get("a..b")
+        self.assertEqual(banc.calls[0]["url"], f"{BASE}/v2/contacts/a..b")
+
+    def test_retry_after_trop_long_rend_la_main(self):
+        banc = Banc([refus(429, "rate_limited", headers={"retry-after": "86400"})])
+        with self.assertRaises(RateLimitError) as ctx:
+            banc.fm.account.balance()
+        self.assertEqual(ctx.exception.retry_after, 86400)
+        self.assertEqual(banc.sleeps, [])
+        self.assertEqual(len(banc.calls), 1)
+
+    def test_retry_after_de_60_secondes_attendu(self):
+        banc = Banc([refus(429, "rate_limited", headers={"retry-after": "60"}), ok(200, {"balances": []})])
+        banc.fm.account.balance()
+        self.assertEqual(banc.sleeps, [60.0])
+
+    def test_retry_after_illisible_sans_planter(self):
+        for valeur in ("²", "-1", "1.5", "demain"):
+            banc = Banc([refus(429, "rate_limited", headers={"retry-after": valeur})])
+            with self.assertRaises(RateLimitError) as ctx:
+                banc.fm.account.balance()
+            self.assertIsNone(ctx.exception.retry_after)
+
+
 class Version(unittest.TestCase):
     def test_version_alignee_sur_le_paquet(self):
         import os

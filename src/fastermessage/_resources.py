@@ -10,7 +10,11 @@ Result = Dict[str, Any]
 
 
 def _segment(value: str) -> str:
-    return urllib.parse.quote(str(value), safe="")
+    text = str(value)
+    # ``..`` changerait la route visée, et un identifiant vide viserait la collection.
+    if text in ("", ".", ".."):
+        raise ValueError("Identifiant de ressource invalide.")
+    return urllib.parse.quote(text, safe="")
 
 
 class _Resource:

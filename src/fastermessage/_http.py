@@ -24,10 +24,18 @@ from .errors import (
     ServerError,
 )
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
+
+# Au-delà, le SDK ne bloque pas votre programme : il rend la main avec RateLimitError.
+MAX_RETRY_AFTER = 60
 
 # Un même appel rejoué garde sa clé : c'est ce qui rend une reprise sans risque.
 _MUTATING = {"POST", "PATCH", "PUT", "DELETE"}
+
+
+def _check_header(name: str, value: str) -> None:
+    if not all(32 <= ord(char) <= 126 for char in value):
+        raise ValueError(f"{name} contient des caractères invalides.")
 
 
 class Response(NamedTuple):
@@ -104,6 +112,11 @@ class Requester:
         idempotency_key: Optional[str] = None,
         request_id: Optional[str] = None,
     ) -> Any:
+        if idempotency_key is not None:
+            _check_header("idempotency_key", idempotency_key)
+        if request_id is not None:
+            _check_header("request_id", request_id)
+
         url = self._base_url + path + _query_string(query)
         headers = {
             "Authorization": self._authorization,
@@ -161,7 +174,9 @@ def _retry_delay(failure: ApiError, attempt: int) -> Optional[float]:
     jamais une panne.
     """
     if failure.status == 429:
-        return None if failure.retry_after is None else float(failure.retry_after)
+        if failure.retry_after is None or failure.retry_after > MAX_RETRY_AFTER:
+            return None
+        return float(failure.retry_after)
     if failure.code == "idempotency_key_in_flight":
         return _backoff(attempt)
     if failure.status >= 500 and failure.status != 501:
@@ -229,5 +244,5 @@ def _to_error(response: Response) -> ApiError:
         _string(error.get("type")) or "",
         _string(error.get("param")),
         _string(error.get("request_id")) or response.headers.get("x-request-id"),
-        int(retry_after) if retry_after.isdigit() else None,
+        int(retry_after) if retry_after.isascii() and retry_after.isdigit() else None,
     )
