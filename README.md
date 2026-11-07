@@ -43,6 +43,7 @@ Sur le domaine d'API de votre marque : `FasterMessage(user, password, key, base_
 | OTP | `fm.otp.request()`, `fm.otp.verify()` |
 | Contacts | `fm.contacts`, `fm.contact_groups` : `create`, `get`, `list`, `all`, `update`, `delete` |
 | Compte | `fm.account.balance()`, `credits()`, `all_credits()` |
+| Repli | `fallback` sur `send()` et `fm.otp.request()` |
 | Webhooks | `webhook.is_genuine()` |
 
 Les réponses sont des dictionnaires, aux noms de champs de l'API : un champ ajouté par l'API est disponible sans mise à jour du SDK. La référence complète est dans la [documentation de l'API](https://www.fastermessage.com/docs).
@@ -55,6 +56,39 @@ for contact in fm.contacts.all(group_id="g_123"):
 ```
 
 WhatsApp et la voix ne sont pas encore servis par l'API v2.
+
+## Repli entre canaux
+
+`fallback` est une liste ordonnée d'étapes `channel`, `to`, `from`, `content`, essayées dans l'ordre si le message principal échoue. `channel` vaut `sms` ou `email` (WhatsApp et la voix sont acceptés mais répondent « non disponible »). Vers l'e-mail, `content` est facultatif ; vers le SMS, il est obligatoire. Accepté par `fm.sms.send()`, `fm.email.send()`, `fm.messages.send()` et `fm.otp.request()`, refusé par `fm.sms.send_batch()`.
+
+```python
+message = fm.sms.send({
+    "to": "+2290160000000",
+    "from": "FASTERMSG",
+    "content": "Votre commande est prete.",
+    "fallback": [
+        {"channel": "email", "to": "client@exemple.com", "from": "no-reply@votre-marque.com", "content": {"subject": "Votre commande"}},
+    ],
+})
+
+print((message["fallback"] or {}).get("state"))  # watching
+```
+
+La réponse porte `fallback` (`None` sans repli) : `will_run`, `state` (`blocked`, `watching`, `triggered`, `not_needed`, `failed`, `expired`) et `steps`, une entrée par étape (`channel`, `will_run`, `reason`, `message_id`), avec son `reason` quand elle ne partira pas (`insufficient_balance`, `sender_not_allowed`…). Le message de repli porte `fallback_of`, l'identifiant du message d'origine.
+
+Pour un OTP, un `content` propre doit contenir `{code}`, et `callback_url` reçoit le rappel de repli :
+
+```python
+otp = fm.otp.request({
+    "to": "+2290160000000",
+    "fallback": [
+        {"channel": "email", "to": "client@exemple.com", "from": "no-reply@votre-marque.com", "content": {"text": "Votre code : {code}"}},
+    ],
+    "callback_url": "https://votre-site.com/webhooks/fastermessage",
+})
+```
+
+Avec une clé `fm_test_`, `"test_outcome": "failed"` (ou `"delivered"`) simule l'issue du message principal pour voir le repli partir ; avec une clé réelle, c'est un `400`.
 
 ## Rejeux sans double envoi
 
@@ -105,10 +139,17 @@ def fastermessage_webhook():
         return "", 401
 
     event = json.loads(body)
+    if event.get("event") == "fallback":
+        if event["fallback"]["state"] == "triggered":
+            ...  # Le repli est parti : event["fallback"]["steps"][…]["message_id"] donne les messages envoyés.
+        elif event["fallback"]["state"] == "failed":
+            ...  # Aucune étape n'a pu partir : event["fallback"]["steps"][…]["reason"] dit pourquoi.
     return "", 200  # Répondez sous 10 secondes : confiez le traitement à une tâche de fond.
 ```
 
 Générez le secret dans « Intégration & API ». Le rappel SMS a le format `uuid`, `level`, `status` ; le rappel e-mail `id`, `status`, `error`.
+
+Le rappel de repli se reconnaît à `event` qui vaut `fallback` : `id` (le message principal, ou la demande OTP si `kind` vaut `otp`), `kind`, `channel`, `client_reference`, `fallback` et `event_at`. Il part quand le repli part (`state` `triggered`) ou ne peut pas partir (`state` `failed`), en POST, signé comme les autres, vers le `callback_url` de la demande, sinon vers l'adresse du compte. Jamais avec une clé de test, et rien pour un compte aux événements vidés.
 
 ## Tests
 

@@ -24,7 +24,7 @@ from .errors import (
     ServerError,
 )
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 # Au-delà, le SDK ne bloque pas votre programme : il rend la main avec RateLimitError.
 MAX_RETRY_AFTER = 60

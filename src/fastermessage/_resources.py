@@ -1,4 +1,11 @@
-"""Les ressources de l'API. Paramètres et réponses gardent les noms de champs de l'API."""
+"""Les ressources de l'API. Paramètres et réponses gardent les noms de champs de l'API.
+
+Repli entre canaux : ``sms.send``, ``email.send``, ``messages.send`` et ``otp.request`` acceptent
+``fallback``, une liste ordonnée d'étapes ``{"channel": "sms"|"email", "to", "from", "content"}``.
+``content`` est obligatoire vers le SMS (chaîne ou ``{"text", "unicode"}``), facultatif vers l'e-mail.
+La réponse porte alors ``fallback`` (``will_run``, ``state``, ``steps``), ``None`` sans repli.
+``test_outcome`` (``failed`` ou ``delivered``) simule l'issue, avec une clé ``fm_test_`` seulement.
+"""
 
 import urllib.parse
 from typing import Any, Dict, Iterator, List, Mapping, Optional
@@ -40,7 +47,10 @@ class Sms(_Resource):
         return self._http.request("POST", "/v2/sms/send", body=params, idempotency_key=idempotency_key, request_id=request_id)
 
     def send_batch(self, params: Params, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Result:
-        """Jusqu'à 500 lignes. Lisez toujours ``errors`` : un retour normal ne garantit pas que toutes soient parties."""
+        """Jusqu'à 500 lignes. Lisez toujours ``errors`` : un retour normal ne garantit pas que toutes soient parties.
+
+        Le lot refuse ``fallback`` (400) : envoyez un par un avec ``send``.
+        """
         return self._http.request("POST", "/v2/sms/batch", body=params, idempotency_key=idempotency_key, request_id=request_id)
 
 
@@ -66,6 +76,11 @@ class Messages(_Resource):
 
 class Otp(_Resource):
     def request(self, params: Params, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Result:
+        """Émet un code, par SMS sans ``channel``. Conservez ``id`` : le code n'est jamais renvoyé.
+
+        ``fallback`` (vers l'e-mail) : un ``content`` propre doit contenir ``{code}``. ``callback_url``
+        reçoit le rappel de repli, à défaut l'adresse du compte.
+        """
         return self._http.request("POST", "/v2/otp", body={"channel": "sms", **params}, idempotency_key=idempotency_key, request_id=request_id)
 
     def verify(self, id: str, code: str) -> Result:

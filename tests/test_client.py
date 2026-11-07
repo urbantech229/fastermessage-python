@@ -153,6 +153,19 @@ class OtpTests(unittest.TestCase):
         self.assertEqual(banc.calls[0]["url"], f"{BASE}/v2/otp/verify")
         self.assertEqual(banc.calls[0]["json"], {"id": "o1", "code": "000000"})
 
+    def test_transmet_le_repli_et_rend_son_etat(self):
+        repli = {"will_run": True, "state": "watching", "steps": [{"channel": "email", "will_run": True, "reason": None, "message_id": None}]}
+        banc = Banc([ok(201, {"id": "o1", "fallback": repli})])
+        fallback = [{"channel": "email", "to": "a@b.test", "from": "no-reply@b.test", "content": {"text": "Code : {code}"}}]
+        otp = banc.fm.otp.request(
+            {"to": "1", "fallback": fallback, "test_outcome": "failed", "callback_url": "https://exemple.test/repli"}
+        )
+        envoye = banc.calls[0]["json"]
+        self.assertEqual(envoye["fallback"], fallback)
+        self.assertEqual(envoye["test_outcome"], "failed")
+        self.assertEqual(envoye["callback_url"], "https://exemple.test/repli")
+        self.assertEqual(otp["fallback"]["state"], "watching")
+
 
 class IdempotenceEtReprises(unittest.TestCase):
     def test_une_cle_par_ecriture(self):
@@ -334,6 +347,17 @@ class Webhooks(unittest.TestCase):
         self.assertFalse(webhook.is_genuine(self.corps, self.signe(self.corps, "autre"), "whsec"))
         self.assertFalse(webhook.is_genuine(self.corps, None, "whsec"))
         self.assertFalse(webhook.is_genuine(self.corps, self.signe(self.corps), ""))
+
+    def test_rappel_de_repli_verifie_comme_les_autres(self):
+        corps = json.dumps({
+            "event": "fallback", "id": "m1", "kind": "message", "channel": "sms", "client_reference": None,
+            "fallback": {"will_run": True, "state": "triggered", "steps": [{"channel": "email", "will_run": True, "reason": None, "message_id": "m2"}]},
+            "event_at": "2026-11-07T10:00:00.000Z",
+        })
+        self.assertTrue(webhook.is_genuine(corps, self.signe(corps), "whsec"))
+        evenement = json.loads(corps)
+        self.assertEqual(evenement["event"], "fallback")
+        self.assertEqual(evenement["fallback"]["state"], "triggered")
 
     def test_mauvaise_longueur_sans_planter(self):
         self.assertFalse(webhook.is_genuine(self.corps, "sha256=court", "whsec"))
