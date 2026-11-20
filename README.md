@@ -38,9 +38,10 @@ Sur le domaine d'API de votre marque : `FasterMessage(user, password, key, base_
 |---|---|
 | SMS | `fm.sms.send()`, `fm.sms.send_batch()` (500 lignes) |
 | E-mail | `fm.email.send()` |
+| WhatsApp | `fm.whatsapp.send()` |
 | Canal en paramètre | `fm.messages.send()` |
 | Suivi | `fm.messages.get()`, `list()`, `all()` |
-| OTP | `fm.otp.request()`, `fm.otp.verify()` |
+| OTP | `fm.otp.request()` (SMS ou WhatsApp), `fm.otp.verify()` |
 | Contacts | `fm.contacts`, `fm.contact_groups` : `create`, `get`, `list`, `all`, `update`, `delete` |
 | Compte | `fm.account.balance()`, `credits()`, `all_credits()` |
 | Repli | `fallback` sur `send()` et `fm.otp.request()` |
@@ -55,11 +56,27 @@ for contact in fm.contacts.all(group_id="g_123"):
     print(contact["phone_number"])
 ```
 
-WhatsApp et la voix ne sont pas encore servis par l'API v2.
+## WhatsApp
+
+`from` est le numéro WhatsApp raccordé à votre compte : il est obligatoire. Deux contenus, selon la règle de Meta :
+
+```python
+# Un modèle approuvé, à tout moment. Variables : "1", "2"… pour {{1}}, {{2}}… du corps.
+fm.whatsapp.send({
+    "to": "+2290160000000",
+    "from": "+2290161000000",
+    "content": {"template": "confirmation_commande", "language": "fr", "variables": {"1": "Awa", "2": "1187"}},
+})
+
+# Un texte libre, seulement si le destinataire vous a écrit dans les 24 h (sinon 409 session_window_closed).
+fm.whatsapp.send({"to": "+2290160000000", "from": "+2290161000000", "content": {"text": "Votre commande est prête."}})
+```
+
+Un message lu reste `delivered` ; sa lecture se lit dans `read_at`. L'envoi programmé, le lot et les en-têtes média ne sont pas encore ouverts sur WhatsApp. La voix n'est pas encore servie par l'API v2.
 
 ## Repli entre canaux
 
-`fallback` est une liste ordonnée d'étapes `channel`, `to`, `from`, `content`, essayées dans l'ordre si le message principal échoue. `channel` vaut `sms` ou `email` (WhatsApp et la voix sont acceptés mais répondent « non disponible »). Vers l'e-mail, `content` est facultatif ; vers le SMS, il est obligatoire. Accepté par `fm.sms.send()`, `fm.email.send()`, `fm.messages.send()` et `fm.otp.request()`, refusé par `fm.sms.send_batch()`.
+`fallback` est une liste ordonnée d'étapes `channel`, `to`, `from`, `content`, essayées dans l'ordre si le message principal échoue. `channel` vaut `sms`, `email` ou `whatsapp` (la voix est acceptée mais répond « non disponible »). Vers l'e-mail, `content` est facultatif (sauf après un modèle WhatsApp) ; vers le SMS, il est obligatoire ; vers WhatsApp, c'est un modèle (`template`, `language`, `variables`) ou un texte (`text`), qui ne part que si la fenêtre de 24 h est ouverte. Accepté par `fm.sms.send()`, `fm.email.send()`, `fm.whatsapp.send()`, `fm.messages.send()` et `fm.otp.request()`, refusé par `fm.sms.send_batch()`.
 
 ```python
 message = fm.sms.send({
@@ -86,6 +103,12 @@ otp = fm.otp.request({
     ],
     "callback_url": "https://votre-site.com/webhooks/fastermessage",
 })
+```
+
+Le code peut aussi partir par WhatsApp, par votre modèle d'authentification approuvé (`template` facultatif s'il est unique), `from` étant alors le numéro WhatsApp :
+
+```python
+otp = fm.otp.request({"to": "+2290160000000", "channel": "whatsapp", "from": "+2290161000000"})
 ```
 
 Avec une clé `fm_test_`, `"test_outcome": "failed"` (ou `"delivered"`) simule l'issue du message principal pour voir le repli partir ; avec une clé réelle, c'est un `400`.

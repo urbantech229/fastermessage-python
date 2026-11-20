@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fastermessage"
-version = "0.1.2"
-description = "SDK Python officiel de l'API FasterMessage v2 : SMS, e-mail, OTP, contacts et webhooks."
+version = "0.2.0"
+description = "SDK Python officiel de l'API FasterMessage v2 : SMS, e-mail, WhatsApp, OTP, contacts et webhooks."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-keywords = ["fastermessage", "sms", "email", "otp", "api", "sdk"]
+keywords = ["fastermessage", "sms", "email", "whatsapp", "otp", "api", "sdk"]
 dependencies = []
 classifiers = [
   "License :: OSI Approved :: MIT License",

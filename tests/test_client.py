@@ -112,7 +112,8 @@ class EnTetesEtChemins(unittest.TestCase):
         self.assertEqual(banc.calls[0]["headers"]["X-Request-Id"], "r-1")
 
     def test_routes_des_autres_ressources(self):
-        banc = Banc([ok(200, {"id": "i"}) for _ in range(9)])
+        banc = Banc([ok(200, {"id": "i"}) for _ in range(10)])
+        banc.fm.whatsapp.send({"to": "1", "from": "+2", "content": {"template": "t", "variables": {"1": "a"}}})
         banc.fm.sms.send_batch({"from": "F", "content": "c", "messages": [{"to": "1"}]})
         banc.fm.messages.send({"channel": "sms", "to": "1", "content": "c"})
         banc.fm.contacts.create({"group_id": "g", "phone_number": "1"})
@@ -125,6 +126,7 @@ class EnTetesEtChemins(unittest.TestCase):
         self.assertEqual(
             [f"{c['method']} {c['url'].replace(BASE, '')}" for c in banc.calls],
             [
+                "POST /v2/whatsapp/send",
                 "POST /v2/sms/batch",
                 "POST /v2/messages",
                 "POST /v2/contacts",
@@ -146,6 +148,14 @@ class OtpTests(unittest.TestCase):
         self.assertEqual(banc.calls[0]["url"], f"{BASE}/v2/otp")
         self.assertEqual(banc.calls[0]["json"]["channel"], "sms")
         self.assertEqual(banc.calls[1]["json"]["channel"], "email")
+
+    def test_transmet_le_canal_whatsapp_et_la_langue(self):
+        banc = Banc([ok(201, {"id": "o1"})])
+        banc.fm.otp.request({"to": "1", "channel": "whatsapp", "from": "+2", "template": "code_fr", "language": "fr"})
+        self.assertEqual(
+            banc.calls[0]["json"],
+            {"channel": "whatsapp", "to": "1", "from": "+2", "template": "code_fr", "language": "fr"},
+        )
 
     def test_verifie_avec_identifiant_et_code(self):
         banc = Banc([ok(200, {"status": "approved"})])

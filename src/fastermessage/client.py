@@ -5,7 +5,7 @@ import urllib.parse
 from typing import Callable, Optional
 
 from ._http import Requester, Transport
-from ._resources import Account, ContactGroups, Contacts, Email, Messages, Otp, Sms
+from ._resources import Account, ContactGroups, Contacts, Email, Messages, Otp, Sms, Whatsapp
 
 DEFAULT_BASE_URL = "https://api.fastermessage.com"
 
@@ -75,6 +75,7 @@ class FasterMessage:
 
         self.sms = Sms(http)
         self.email = Email(http)
+        self.whatsapp = Whatsapp(http)
         self.messages = Messages(http)
         self.otp = Otp(http)
         self.contacts = Contacts(http)
