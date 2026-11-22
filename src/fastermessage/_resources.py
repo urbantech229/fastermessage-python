@@ -58,6 +58,10 @@ class Sms(_Resource):
 
 class Email(_Resource):
     def send(self, params: Params, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Result:
+        """Envoie un e-mail. ``content`` : ``{"subject", "html", "text", "reply_to"}`` — ``subject`` et
+        ``html`` et/ou ``text`` obligatoires ; ``reply_to`` facultatif, l'adresse qui recevra les réponses,
+        sans nom affiché.
+        """
         return self._http.request("POST", "/v2/email/send", body=params, idempotency_key=idempotency_key, request_id=request_id)
 
     def list_senders(self, **query: Any) -> Result:
