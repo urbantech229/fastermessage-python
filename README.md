@@ -39,6 +39,8 @@ Sur le domaine d'API de votre marque : `FasterMessage(user, password, key, base_
 | SMS | `fm.sms.send()`, `fm.sms.send_batch()` (500 lignes) |
 | E-mail | `fm.email.send()` |
 | WhatsApp | `fm.whatsapp.send()` |
+| Ce que vous pouvez utiliser (WhatsApp) | `fm.whatsapp.list_numbers()`, `list_templates()`, `all_numbers()`, `all_templates()` |
+| Ce que vous pouvez utiliser (e-mail) | `fm.email.list_senders()`, `list_templates()`, `all_senders()`, `all_templates()` |
 | Canal en paramètre | `fm.messages.send()` |
 | Suivi | `fm.messages.get()`, `list()`, `all()` |
 | OTP | `fm.otp.request()` (SMS ou WhatsApp), `fm.otp.verify()` |
@@ -55,6 +57,22 @@ Les réponses sont des dictionnaires, aux noms de champs de l'API : un champ ajo
 for contact in fm.contacts.all(group_id="g_123"):
     print(contact["phone_number"])
 ```
+
+## Ce que vous pouvez utiliser
+
+Ces lectures ne rendent que ce qui est validé et utilisable sur votre compte, exactement ce que l'envoi accepte : un élément listé ne sera pas refusé à l'envoi.
+
+```python
+for number in fm.whatsapp.all_numbers():
+    print(number["number"])                      # à mettre dans `from`
+for template in fm.whatsapp.all_templates():
+    print(template["name"], template["language"], ",".join(template["variables"]))  # 1,2,header…
+for sender in fm.email.all_senders():
+    print(sender["address"])                     # à mettre dans `from` d'un e-mail
+page = fm.email.list_templates(limit=20)         # modèles publiés : subject, html, from_email…
+```
+
+Un modèle WhatsApp de catégorie `authentication` sert `fm.otp.request()`, pas `send()`.
 
 ## WhatsApp
 

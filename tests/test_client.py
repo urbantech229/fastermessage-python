@@ -342,6 +342,63 @@ class ReponsesEtPagination(unittest.TestCase):
         self.assertEqual(banc.calls[0]["url"], f"{BASE}/v2/credits?type=debit")
 
 
+class CeQueVousPouvezUtiliser(unittest.TestCase):
+    def test_lit_les_ressources_utilisables_sur_leurs_routes(self):
+        page = {"data": [], "has_more": False, "next_cursor": None}
+        banc = Banc([ok(200, page) for _ in range(4)])
+        banc.fm.whatsapp.list_numbers(limit=10)
+        banc.fm.whatsapp.list_templates()
+        banc.fm.email.list_senders()
+        banc.fm.email.list_templates(cursor="c1")
+        self.assertEqual(
+            [f"{c['method']} {c['url'].replace(BASE, '')}" for c in banc.calls],
+            [
+                "GET /v2/whatsapp/numbers?limit=10",
+                "GET /v2/whatsapp/templates",
+                "GET /v2/email/senders",
+                "GET /v2/email/templates?cursor=c1",
+            ],
+        )
+        # Une lecture ne porte jamais de clé d'idempotence, ni de corps.
+        for call in banc.calls:
+            self.assertNotIn("Idempotency-Key", call["headers"])
+            self.assertIsNone(call["json"])
+
+    def test_parcourt_tous_les_modeles_whatsapp(self):
+        banc = Banc(
+            [
+                ok(200, {"data": [{"name": "a"}], "has_more": True, "next_cursor": "c1"}),
+                ok(200, {"data": [{"name": "b"}], "has_more": False, "next_cursor": None}),
+            ]
+        )
+        self.assertEqual([t["name"] for t in banc.fm.whatsapp.all_templates(limit=1)], ["a", "b"])
+        self.assertEqual(banc.calls[1]["url"], f"{BASE}/v2/whatsapp/templates?limit=1&cursor=c1")
+
+    def test_parcourt_numeros_expediteurs_et_modeles_e_mail(self):
+        def pages(cle):
+            return [
+                ok(200, {"data": [{cle: 1}], "has_more": True, "next_cursor": "c2"}),
+                ok(200, {"data": [{cle: 2}], "has_more": False, "next_cursor": None}),
+            ]
+
+        banc = Banc(pages("number") + pages("address") + pages("id"))
+        vus = [n["number"] for n in banc.fm.whatsapp.all_numbers()]
+        vus += [s["address"] for s in banc.fm.email.all_senders()]
+        vus += [t["id"] for t in banc.fm.email.all_templates()]
+        self.assertEqual(vus, [1, 2, 1, 2, 1, 2])
+        self.assertEqual(
+            [c["url"].replace(BASE, "") for c in banc.calls],
+            [
+                "/v2/whatsapp/numbers",
+                "/v2/whatsapp/numbers?cursor=c2",
+                "/v2/email/senders",
+                "/v2/email/senders?cursor=c2",
+                "/v2/email/templates",
+                "/v2/email/templates?cursor=c2",
+            ],
+        )
+
+
 class Webhooks(unittest.TestCase):
     corps = '{"id":"m1","status":"delivered"}'
 

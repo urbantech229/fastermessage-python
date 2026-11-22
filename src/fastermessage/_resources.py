@@ -60,6 +60,31 @@ class Email(_Resource):
     def send(self, params: Params, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Result:
         return self._http.request("POST", "/v2/email/send", body=params, idempotency_key=idempotency_key, request_id=request_id)
 
+    def list_senders(self, **query: Any) -> Result:
+        """Une page des adresses expéditrices utilisables dans ``from`` : ``data``, ``has_more``, ``next_cursor``.
+
+        Adresses actives (domaine authentifié), et l'adresse par défaut de votre marque si vous y avez droit.
+        Chaque adresse : ``address`` (à mettre dans ``from``), ``name``, ``domain``, ``brand_default``.
+        Filtres : ``limit`` (50 par défaut, 200 au plus) et ``cursor``.
+        """
+        return self._http.request("GET", "/v2/email/senders", query=query)
+
+    def all_senders(self, **query: Any) -> Iterator[Result]:
+        """Toutes les adresses expéditrices utilisables, page après page."""
+        return self._paginate("/v2/email/senders", query)
+
+    def list_templates(self, **query: Any) -> Result:
+        """Une page des modèles e-mail publiés : ``data``, ``has_more``, ``next_cursor``.
+
+        Chaque modèle : ``id``, ``name``, ``subject``, ``html``, ``from_email`` (``None`` si l'adresse du modèle
+        n'est plus utilisable), ``from_name``, ``reply_to``. Filtres : ``limit`` et ``cursor``.
+        """
+        return self._http.request("GET", "/v2/email/templates", query=query)
+
+    def all_templates(self, **query: Any) -> Iterator[Result]:
+        """Tous les modèles e-mail publiés, page après page."""
+        return self._paginate("/v2/email/templates", query)
+
 
 class Whatsapp(_Resource):
     def send(self, params: Params, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Result:
@@ -72,6 +97,33 @@ class Whatsapp(_Resource):
         lecture se lit dans ``read_at``. L'envoi programmé n'est pas encore ouvert sur WhatsApp.
         """
         return self._http.request("POST", "/v2/whatsapp/send", body=params, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list_numbers(self, **query: Any) -> Result:
+        """Une page des numéros WhatsApp qui peuvent envoyer maintenant : ``data``, ``has_more``, ``next_cursor``.
+
+        Chaque numéro : ``number`` (à mettre dans ``from``), ``display_name``, ``label``, ``quality``,
+        ``is_default``. Filtres : ``limit`` (50 par défaut, 200 au plus) et ``cursor``.
+        """
+        return self._http.request("GET", "/v2/whatsapp/numbers", query=query)
+
+    def all_numbers(self, **query: Any) -> Iterator[Result]:
+        """Tous les numéros WhatsApp envoyables, page après page."""
+        return self._paginate("/v2/whatsapp/numbers", query)
+
+    def list_templates(self, **query: Any) -> Result:
+        """Une page des modèles approuvés et envoyables par l'API : ``data``, ``has_more``, ``next_cursor``.
+
+        Chaque modèle : ``id``, ``name``, ``language``, ``category``, ``header_text``, ``body``, ``footer``,
+        ``variables`` (les clés attendues dans ``content.variables`` : ``"1"``, ``"2"``…, ``"header"``,
+        ``"button_1"``…) et ``number``, le numéro de son compte WhatsApp Business (Meta refuse un modèle envoyé
+        depuis un autre compte). Un modèle de catégorie ``authentication`` sert ``fm.otp.request()``, pas
+        ``send()``. Filtres : ``limit`` et ``cursor``.
+        """
+        return self._http.request("GET", "/v2/whatsapp/templates", query=query)
+
+    def all_templates(self, **query: Any) -> Iterator[Result]:
+        """Tous les modèles envoyables, page après page."""
+        return self._paginate("/v2/whatsapp/templates", query)
 
 
 class Messages(_Resource):
